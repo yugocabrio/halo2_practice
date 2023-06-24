@@ -29,11 +29,18 @@ struct TutorialConfig {
 
 // 上のcolumnを宣言するconfigを marker: PhantomData structと一緒にラップして
 // _Chipというstructを作ります。
+// Phantom dataというのは、ジェネリクス<F>を埋めるダミー(マーカー)みたいなもの
 struct TutorialChip<F: FieldExt> {
     config: TutorialConfig,
     marker: PhantomData<F>,
 }
 
+// new function should take in a config and produce a chip.
+// new functionでは、回路を表現した行列（TutorialConfig）を引数として受け取り、
+// TutorialChipのインスタンスを生成する。（コンストラクタ）
+// ここの返り値（インスタンス）は、synthesize functionのlet cs = TutorialChip::new(config)で生成されて、
+// csという変数に格納され、TutorailChipのインスタンスに対する参照になる。
+// csを介して、TutorialChipのメソッドにアクセスすることができる。
 impl<F: FieldExt> TutorialChip<F> {
     fn new(config: TutorialConfig) -> Self {
         TutorialChip {
@@ -43,6 +50,8 @@ impl<F: FieldExt> TutorialChip<F> {
     }
 }
 
+// TutorialChipという型に対してChipという特性（トレイト）
+// イマイチ何かよくわかっていない。
 impl<F: FieldExt> Chip<F> for TutorialChip<F> {
     type Config = TutorialConfig;
     type Loaded = ();
@@ -50,14 +59,16 @@ impl<F: FieldExt> Chip<F> for TutorialChip<F> {
     fn config(&self) -> &Self::Config {
         &self.config
     }
-
+ 
     fn loaded(&self) -> &Self::Loaded {
         &()
     }
 }
 
-// Chipにfunctionを持たせる(Columnをどのように組み合わせるかをコードを記述する)
-// Chipの上にtraitを通じて、functionの定義を行う。
+// TutorialChipにfunctionを持たせる(Columnをどのように組み合わせるかをコードを記述する)
+// 計算（加算、乗算）や操作（ワイヤのコピー、Public inputの公開）を回路に行うためのAPIみたいなもの。
+// TutorialChipにTutorialComposer traitを通じて、functionの定義を行う。
+// このtraitは一連の関数などを定義するところで、具体的な処理は実装されない。次のimplで関数の処理を書く。
 trait TutorialComposer<F: FieldExt> {
     fn raw_multiply<FM>(
         &self,
@@ -76,7 +87,7 @@ trait TutorialComposer<F: FieldExt> {
         FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>;
     
     // Ensure two wire value are the same, in effect connecting the wires to each other
-    // copy constraintsのチェック（Plonkの場合はPermutation Argument）
+    // copy constraintsのチェック（PlonKの場合はPermutation Argument）
     fn copy(&self,
         layouter: &mut impl Layouter<F>,
         a: Cell,
@@ -92,6 +103,11 @@ trait TutorialComposer<F: FieldExt> {
     ) -> Result<(), Error>;
 } 
 
+// layouterは、Region structやRegionLayouter traitと連携して、
+// 必要なゲート（operation）を定義することができます。
+// assign_regionは、assign_regionのoutputを出力するためのもの
+// witness値を割り当てる時は、region structに実装されたassign_advice(Region, annotation, column, offset, to)
+// そしてこの関数は、RegionLayouter traitのassign_advice(RegionLayouter, annotation, column, offset, to)を呼び出す。
 impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
     fn raw_multiply<FM>(
         &self,
@@ -100,16 +116,20 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
     ) -> Result<(Cell, Cell, Cell), Error>
     where
         FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>,
-    {
-        layouter.assign_region(
-            || "mul",
-            |mut region| {
+    {      
+        // layouterとregionの違いがよくわかっていません。。。。
+        // layouter traitのassign_regionという関数
+        // assign_advice(Region, annotation, column, offset, to)
+        layouter.assign_region( // layouterにregionを割り当てる
+            || "mul", // エラーメッセージの提供?
+            |mut region| { // このクロージャーは、mut regionを引数にとり、それを使用してセルのアサインを行う。
                 let mut values = None;
                 let lhs = region.assign_advice(
-                    || "lhs",
-                    self.config.l,
-                    0,
-                    || {
+                    //アドバイスコラムに値をアサイン
+                    || "lhs", // エラーメッセージ、annotation
+                    self.config.l, // advice columnの指定
+                    0, // 行のオフセット、あなたが割り当てを始めたい行の相対位置を指定します。
+                    || { // toの引数
                         values = Some(f());
                         values.unwrap().map(|v| v.0)
                     },
@@ -126,8 +146,10 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
                     self.config.o,
                     0,
                     || values.unwrap().map(|v| v.2),
-                )?;
-
+                )?; 
+                // これはTutorialCinfigからわかるように、fiexdだけど中身としてはselectorのようなもの
+                // l*sl + r*sr + (l*r)*sm - o*so + sc + PI = 0
+                // mulだから、smとsoは1にしておくことで、制約がかかるのだよ
                 region.assign_fixed(|| "m", self.config.sm, 0, || Value::known(F::one()))?;
                 region.assign_fixed(|| "o", self.config.so, 0, || Value::known(F::one()))?;
 
@@ -136,7 +158,7 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
         )
     }
 
-    fn raw_add<FM>(
+    fn raw_add<FM>( // raw_multiplyと同じ！！
         &self,
         layouter: &mut impl Layouter<F>,
         mut f: FM,
@@ -190,6 +212,9 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
         )
     }
 
+    // 一部のセルの値がプルーフ検証時に外部からアクセス可能である必要がある場合に使用されます。
+    // cell: 公開領域にエクスポートするセルを指定します。
+    // row: 公開領域での cell の行位置を指定します。
     fn expose_public(
         &self,
         layouter: &mut impl Layouter<F>,
