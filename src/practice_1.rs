@@ -213,6 +213,8 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
     }
 
     // 一部のセルの値がプルーフ検証時に外部からアクセス可能である必要がある場合に使用されます。
+    // 簡単にいうと、とあるセルの数値を、PIのcolumnに移行しますよというもの。
+    // MockProverでは、Publicinputで整合性をとれているかのチェックをしていると思われる。
     // cell: 公開領域にエクスポートするセルを指定します。
     // row: 公開領域での cell の行位置を指定します。
     fn expose_public(
@@ -233,22 +235,28 @@ struct TutorialCircuit<F: FieldExt> {
 }
 
 impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
-    type Config = TutorialConfig;
-    type FloorPlanner = SimpleFloorPlanner;
+    type Config = TutorialConfig; // CircuitのColumnの定義のこと
+    type FloorPlanner = SimpleFloorPlanner; // これはHalo2独自の用語らしい
 
+    // 値が割り当てられていない場合の状態を指定する
     fn without_witnesses(&self) -> Self {
         Self::default()
     }
 
+    // ここでは、custome gateを定義するのが目的
     fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+        // adviceなのでprivate inputとwitnessのこと
         let l = meta.advice_column();
         let r = meta.advice_column();
         let o = meta.advice_column();
 
+        // enable_equalityはPermutationの対象に含めるということ
         meta.enable_equality(l);
         meta.enable_equality(r);
         meta.enable_equality(o);
 
+        // fixedなのでconstants、selectorやlookup tableのこと
+        // 本当はselector columnがselectorだけど、これはfixedをselectorとして扱っている
         let sm = meta.fixed_column();
         let sl = meta.fixed_column();
         let sr = meta.fixed_column();
@@ -256,10 +264,15 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
         let sc = meta.fixed_column();
 
         #[allow(non_snake_case)]
+        // instanceなのでPublic inputのこと
         let PI = meta.instance_column();
+        // enable_equalityはPermutationの対象に含めるということ
         meta.enable_equality(PI);
 
+        // ここでcustome gateを定義しています。
         meta.create_gate("mini plonk", |meta| {
+            // queryなのでそのcolumnからクエリをします。
+            // Rotationというのは、ずらすって意味で、今回cur（current）だから、ずらさない。
             let l = meta.query_advice(l, Rotation::cur());
             let r = meta.query_advice(r, Rotation::cur());
             let o = meta.query_advice(o, Rotation::cur());
@@ -270,6 +283,7 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
             let sm = meta.query_fixed(sm, Rotation::cur());
             let sc = meta.query_fixed(sc, Rotation::cur());
 
+            // 最終的にこのような制約ができます。
             vec![l.clone() * sl + r.clone() * sr + l * r * sm + (o * so * (-F::one())) + sc]
         });
 
@@ -286,14 +300,17 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
         }
     }
 
+    // Permutation argumentとセルの割り当てを同時に行います
     fn synthesize(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<F>,
     ) -> Result<(), Error> {
+        // TutorialChipがここを通じて組み込まれる
         let cs = TutorialChip::new(config);
 
         // Initialise these values so that we can access them more easily outside the block we actually give them a value in
+        // これらの値を初期化して、実際に値を与えるブロックの外でより簡単にアクセスできるようにします。
         let x: Value<Assigned<_>> = self.x.into();
         let y: Value<Assigned<_>> = self.y.into();
         let consty = Assigned::from(self.constant);
@@ -325,8 +342,10 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
         // Ensure that the constant in the TutorialCircuit struct is correctly used and that the
         // result of the circuit computation is what is expected. (use expose_public))
         cs.expose_public(&mut layouter, b3, 0)?;
+        // layouter.constrain_instance(b3, cs.config.PI, 0)?;
         // Below is another way to expose a public value, this time the output value of the computation
         // (Use constrain_instance)
+        // cs.expose_public(&mut layouter, c3, 1)?;
         layouter.constrain_instance(c3, cs.config.PI, 1)?;
 
         Ok(())
@@ -341,6 +360,7 @@ fn tutorial_test_practice_1() {
 
     // The number of rows in our circuit cannot exceed 2^k. Since our example
     // circuit is very small, we can pick a very small value here.
+    // circuitサイズは2の階上でなければならない。
     let k = 4;
 
     let constant = Fp::from(7);
@@ -348,16 +368,18 @@ fn tutorial_test_practice_1() {
     let y = Fp::from(9);
     let z = Fp::from(25 * 81 + 7);
 
+    // TutorialCircuitから、MockProve用のCircuitを定義
     let circuit: TutorialCircuit<Fp> = TutorialCircuit {
         x: Value::known(x),
         y: Value::known(y),
         constant: constant,
     };
 
-    // let mut public_inputs = vec![constant, z];
+    // MockProverが演算の結果と照らし合わせれ検証する用public_inputs
     let mut public_inputs = vec![constant, z];
 
     // Given the correct public input, our circuit will verify.
+    // やっぱMockProverは、public inputを照らし合わせて整合性を確かめるものみたい。
     let prover = MockProver::run(k, &circuit, vec![public_inputs.clone()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 

@@ -285,10 +285,13 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
 
         // Ensure that the constant in the TutorialCircuit struct is correctly used and that the
         // result of the circuit computation is what is expected. (use expose_public))
-        cs.expose_public(&mut layouter, b3, 0)?;
+        // cs.expose_public(&mut layouter, b3, 0)?;
+        layouter.constrain_instance(b3, cs.config.PI, 0)?;
         // Below is another way to expose a public value, this time the output value of the computation
         // (Use constrain_instance)
         layouter.constrain_instance(c3, cs.config.PI, 1)?;
+        // 次のコードでも良い
+        // cs.expose_public(&mut layouter, c3, 1)?;
 
         Ok(())
     }
