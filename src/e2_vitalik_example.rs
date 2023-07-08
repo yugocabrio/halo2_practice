@@ -322,3 +322,23 @@ fn e2_vitalik_example_test() {
     // assert!(prover.verify().is_err());
 }
 
+// cargo test --features "dev-graph" e2_vitalik_example_plot
+#[cfg(feature = "dev-graph")]
+#[test]
+fn e2_vitalik_example_plot() {
+    use halo2_proofs::{pasta::Fp};
+    use plotters::prelude::*;
+    let root = BitMapBackend::new("e2_vitalik_example_plot.png", (1024, 3096)).into_drawing_area();
+    root.fill(&WHITE).unwrap();
+    let root = root.titled("e2_vitalik_example_plot", ("sans-serif", 60)).unwrap();
+
+    let x_value = Value::known(Fp::from(3));
+    let constant_value = Fp::from(5);
+    let circuit = TutorialCircuit {
+        x: x_value,
+        constant: constant_value
+    };
+    halo2_proofs::dev::CircuitLayout::default()
+        .render(4, &circuit, &root)
+        .unwrap();
+}
