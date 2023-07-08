@@ -332,6 +332,7 @@ fn e2_vitalik_example_plot() {
     root.fill(&WHITE).unwrap();
     let root = root.titled("e2_vitalik_example_plot", ("sans-serif", 60)).unwrap();
 
+    // もしかしたら具体的な値はなくて良いのかも、検証まだ
     let x_value = Value::known(Fp::from(3));
     let constant_value = Fp::from(5);
     let circuit = TutorialCircuit {

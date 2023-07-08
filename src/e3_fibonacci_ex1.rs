@@ -75,11 +75,11 @@ impl<F: FieldExt> FibonacciChip<F> {
                 self.config.selector.enable(&mut region, 0)?;
 
                 let a_cell = region.assign_advice_from_instance(
-                    || "f(0)",
-                    self.config.instance,
-                    0,
-                    self.config.col_a,
-                    0)?;
+                    || "f(0)", // わかりやすいように名前
+                    self.config.instance, // どのcolumnから値を受け取るのか
+                    0, // 何row目のなのか
+                    self.config.col_a, // どのadviceにその値を入れるのか
+                    0)?; // col_aの0行目です
 
                 let b_cell = region.assign_advice_from_instance(
                     || "f(1)",
