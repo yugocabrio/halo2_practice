@@ -40,9 +40,9 @@ impl<F: FieldExt, const RANGE: usize> RangeCheckConfig<F, RANGE> {
             let q = meta.query_selector(q_range_check);
             let value = meta.query_advice(value, Rotation::cur());
 
-            // ⭐️ここのロジックがどうやって実装されているのか未理解
             // given a range R and a value v, returns the expression
             // (v) * (1-v) * (2-v) * (3-v) * ... * (R-1-v)
+            // range内だと0になる
             let range_check = |range: usize, value: Expression<F>| {
                 assert!(range > 0);
                 (1..range).fold(value.clone(), |expr, i| {
@@ -92,7 +92,7 @@ struct Mycircuit<F: FieldExt, const RANGE: usize> {
 
 impl<F: FieldExt, const RANGE: usize> Circuit<F> for Mycircuit<F, RANGE> {
     type Config = RangeCheckConfig<F, RANGE>;
-    // シンプルでは無くて、V1とは何なのか？
+    // simplefloorrunnerでは無くて、V1とは何なのか？
     type FloorPlanner = V1;
 
     fn without_witnesses(&self) -> Self {
