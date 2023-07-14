@@ -163,8 +163,17 @@ impl<F: FieldExt, const RANGE: usize, const LOOKUP_RANGE: usize> Circuit<F> for 
 
 #[test]
 fn e5_lookup_rangecheck() {
-    use std::marker::PhantomData;
     use halo2_proofs::{dev::MockProver, pasta::Fp};
 
-    
+    let k = 9;
+    const RANGE: usize = 8;
+    const LOOKUP_RANGE: usize = 256;
+
+    let circuit = MyCircuit::<Fp, RANGE, LOOKUP_RANGE> {
+        value: Value::known(Fp::from(7 as u64).into()),
+        lookup_value: Value::known(Fp::from(254 as u64).into()),
+    };
+
+    let prover = MockProver::run(k, &circuit, vec![]).unwrap();
+    prover.assert_satisfied();
 }
