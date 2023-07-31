@@ -16,3 +16,10 @@ dev-graph = ["halo2_proofs/dev-graph", "plotters"]
 halo2_proofs = { git = "https://github.com/zcash/halo2.git", rev = "a898d65ae3ad3d41987666f6a03cfc15edae01c4"}
 plotters = { version = "0.3.4", optional = true }
 tabbycat = { version = "0.1", features = ["attributes"], optional = true }
+halo2-base = { git="https://github.com/qope/halo2-lib", branch = "0.2.2", default-features=false,  features = [
+    "halo2-pse",
+    "display",
+]}
+poseidon-circuit = {git ="https://github.com/qope/poseidon-circuit"}
+rand = "0.8.5"
+proc-macro2 = "1.0.60"
