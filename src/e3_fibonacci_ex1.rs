@@ -74,6 +74,7 @@ impl<F: FieldExt> FibonacciChip<F> {
                 // e1, e2でこれがないのは、fiexdをselector列として扱っているからや、理解！
                 self.config.selector.enable(&mut region, 0)?;
 
+                // 追記: 初めの2つの値はPublic input（instance column）にあるのだった
                 let a_cell = region.assign_advice_from_instance(
                     || "f(0)", // わかりやすいように名前
                     self.config.instance, // どのcolumnから値を受け取るのか
@@ -176,6 +177,7 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
 
         // row 0（1番最初のrow）の割り当てを実際に行う
         let (_, mut prev_b, mut prev_c) = chip.assign_first_row(layouter.namespace(|| "first row"))?;
+        // 2行目以降のわりあて
         for _i in 3..10 {
             let c_cell = chip.assign_row(layouter.namespace(|| "next row"), &prev_b, &prev_c)?;
             // ここでpermutation argumentの割り当て
