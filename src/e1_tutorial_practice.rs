@@ -14,6 +14,7 @@ use halo2_proofs::{
 // Avdice means private input
 // Fixed means circuit hardcoded constants (Selector values, constants, lookup table)
 // Instance means public input
+// 多分この時点ではただの構造体
 struct TutorialConfig {
     l: Column<Advice>,
     r: Column<Advice>,
@@ -120,6 +121,9 @@ impl<F: FieldExt> TutorialComposer<F> for TutorialChip<F> {
         // layouterとregionの違いがよくわかっていません。。。。
         // layouter traitのassign_regionという関数
         // assign_advice(Region, annotation, column, offset, to)
+
+        // 追記
+        // layouterはregionの配置を効率よくやってくれる機能なので、ここでは、Regionを構築して、どのようにcolumnの値を割り当てるかを書く
         layouter.assign_region( // layouterにregionを割り当てる
             || "mul", // エラーメッセージの提供?
             |mut region| { // このクロージャーは、mut regionを引数にとり、それを使用してセルのアサインを行う。
@@ -244,6 +248,8 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
     }
 
     // ここでは、custome gateを定義するのが目的
+    // 初めにtableのcolumnの役割を書いたTutorialConfigがConfigって宣言されてて、
+    // ここのconfigure関数で実際の回路の構成が格納される
     fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
         // adviceなのでprivate inputとwitnessのこと
         let l = meta.advice_column();
@@ -301,6 +307,9 @@ impl<F: FieldExt> Circuit<F> for TutorialCircuit<F> {
     }
 
     // Permutation argumentとセルの割り当てを同時に行います
+    // synthesize will calculate the witness and populate the matrix with the corresponding values.
+    // Synthesize function does the computation by filling the cells of gates with initial values,
+    // intermediate values and output values and putting all the gates together.
     fn synthesize(
         &self,
         config: Self::Config,
